@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventory — Product Module</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Mono:wght@300;400;500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --sand: #F5F0E8; --sand-mid: #EDE5D4; --sand-dark: #D4C9B0;
+    --ink: #1C1814; --ink-mid: #4A4338; --ink-light: #8C8070;
+    --gold: #B8965A; --gold-light: #D4AF78; --gold-pale: #F0E4C8;
+    --warm-white: #FAF7F2;
+    --danger: #8B3A2E; --danger-bg: #F5EAE8;
+    --warn: #7A5C1E; --warn-bg: #F5EDD8;
+    --ok: #2E5C3A; --ok-bg: #E8F0EA;
+    --blue: #2A4A6B; --blue-bg: #E8EFF5;
+    --radius: 4px; --radius-lg: 8px;
+    --shadow: 0 1px 3px rgba(28,24,20,.08), 0 4px 16px rgba(28,24,20,.04);
+  }
+  html { font-size: 15px; }
+  body { background: var(--sand); color: var(--ink); font-family: 'Jost', sans-serif; font-weight: 300; min-height: 100vh; line-height: 1.5; }
+
+  /* TOPBAR */
+  .topbar { background: var(--ink); padding: 0 2.5rem; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 200; }
+  .topbar-brand { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 400; letter-spacing: .12em; text-transform: uppercase; color: var(--gold-light); }
+  .topbar-sub { font-size: .7rem; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-light); }
+  .topbar-right { display: flex; align-items: center; gap: 1rem; }
+  .topbar-sku { font-family: 'DM Mono', monospace; font-size: .8rem; color: var(--gold-light); background: rgba(184,150,90,.12); border: 1px solid rgba(184,150,90,.25); padding: 4px 12px; border-radius: 2px; letter-spacing: .06em; min-width: 140px; text-align: center; }
+  .topbar-view-btn { font-family: 'Jost', sans-serif; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--sand); background: transparent; border: 1px solid rgba(255,255,255,.2); border-radius: var(--radius); padding: 5px 14px; cursor: pointer; transition: all .15s; }
+  .topbar-view-btn:hover { border-color: var(--gold); color: var(--gold-light); }
+  .topbar-view-btn.active-view { background: var(--gold); border-color: var(--gold); color: var(--ink); }
+  .gdrive-btn { font-family: 'Jost', sans-serif; font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--sand); background: transparent; border: 1px solid rgba(255,255,255,.15); border-radius: var(--radius); padding: 5px 12px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 6px; }
+  .gdrive-btn:hover { border-color: rgba(255,255,255,.4); }
+  .gdrive-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .gdrive-btn.synced { border-color: var(--ok); color: #6fcf8a; }
+  .gdrive-btn.syncing { opacity: .6; pointer-events: none; }
+
+  /* VIEWS */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ===== FORM VIEW ===== */
+  .page { max-width: 1100px; margin: 0 auto; padding: 2.5rem 2rem 5rem; display: grid; grid-template-columns: 240px 1fr; gap: 2rem; align-items: start; }
+  .sidebar { position: sticky; top: 80px; }
+  .sidebar-label { font-size: .65rem; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-light); margin-bottom: 1rem; padding-left: 1rem; }
+  .nav-item { display: flex; align-items: center; gap: .75rem; padding: .65rem 1rem; border-radius: var(--radius); cursor: pointer; font-size: .85rem; font-weight: 400; color: var(--ink-mid); border: none; background: none; width: 100%; text-align: left; transition: all .15s; border-left: 2px solid transparent; }
+  .nav-item:hover { background: var(--sand-mid); color: var(--ink); }
+  .nav-item.active { background: var(--warm-white); color: var(--ink); border-left: 2px solid var(--gold); font-weight: 500; }
+  .nav-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--sand-dark); flex-shrink: 0; }
+  .nav-item.active .nav-dot { background: var(--gold); }
+  .sidebar-divider { height: 1px; background: var(--sand-dark); margin: 1.25rem 0; }
+  .save-btn { width: 100%; background: var(--ink); color: var(--sand); border: none; border-radius: var(--radius); padding: .75rem 1rem; font-family: 'Jost', sans-serif; font-size: .8rem; font-weight: 400; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; transition: all .15s; margin-bottom: .5rem; }
+  .save-btn:hover { background: var(--ink-mid); }
+  .save-btn:active { transform: scale(.98); }
+  .save-btn.success { background: var(--ok); }
+  .clear-btn { width: 100%; background: transparent; color: var(--ink-light); border: 1px solid var(--sand-dark); border-radius: var(--radius); padding: .6rem 1rem; font-family: 'Jost', sans-serif; font-size: .75rem; font-weight: 400; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; transition: all .15s; }
+  .clear-btn:hover { border-color: var(--ink-light); color: var(--ink); }
+
+  /* IMAGE UPLOAD */
+  .img-upload-wrap { margin-bottom: 0; }
+  .img-drop-zone { width: 100%; aspect-ratio: 1/1; border: 1.5px dashed var(--sand-dark); border-radius: var(--radius-lg); background: var(--sand); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: border-color .2s, background .2s; overflow: hidden; position: relative; }
+  .img-drop-zone:hover { border-color: var(--gold); background: var(--gold-pale); }
+  .img-drop-zone.drag-over { border-color: var(--gold); background: var(--gold-pale); }
+  .img-drop-zone.has-image { border-style: solid; border-color: var(--sand-dark); }
+  .img-placeholder { display: flex; flex-direction: column; align-items: center; gap: .5rem; pointer-events: none; }
+  .img-placeholder-icon { width: 36px; height: 36px; border: 1.5px solid var(--sand-dark); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; }
+  .img-placeholder-icon svg { width: 18px; height: 18px; stroke: var(--ink-light); }
+  .img-placeholder span { font-size: .7rem; letter-spacing: .08em; color: var(--ink-light); text-align: center; line-height: 1.4; }
+  .img-preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; }
+  .img-drop-zone.has-image .img-preview { display: block; }
+  .img-drop-zone.has-image .img-placeholder { display: none; }
+  .img-actions { display: none; gap: .4rem; margin-top: .6rem; }
+  .img-drop-zone.has-image ~ .img-actions { display: flex; }
+  .img-action-btn { flex: 1; background: transparent; border: 1px solid var(--sand-dark); border-radius: var(--radius); padding: .4rem .5rem; font-family: 'Jost', sans-serif; font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-mid); cursor: pointer; transition: all .12s; }
+  .img-action-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .img-action-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+  .img-input { display: none; }
+  .img-label { font-size: .65rem; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-light); display: block; margin-bottom: .5rem; }
+
+  /* PANELS */
+  .main { display: flex; flex-direction: column; gap: 1.5rem; }
+  .panel { background: var(--warm-white); border: 1px solid var(--sand-dark); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow); display: none; }
+  .panel.active { display: block; animation: fadeIn .2s ease; }
+  .panel-header { padding: 1.25rem 1.75rem; border-bottom: 1px solid var(--sand-mid); display: flex; align-items: baseline; justify-content: space-between; }
+  .panel-title { font-family: 'Cormorant Garamond', serif; font-size: 1.35rem; font-weight: 400; letter-spacing: .04em; }
+  .panel-subtitle { font-size: .72rem; color: var(--ink-light); letter-spacing: .06em; }
+  .panel-body { padding: 1.75rem; }
+  .section { margin-bottom: 2rem; }
+  .section:last-child { margin-bottom: 0; }
+  .section-label { font-size: .65rem; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); margin-bottom: 1rem; display: flex; align-items: center; gap: .75rem; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--sand-mid); }
+
+  /* FIELDS */
+  .field-grid { display: grid; gap: 1rem; }
+  .col-2 { grid-template-columns: 1fr 1fr; }
+  .col-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .span-full { grid-column: 1/-1; }
+  .field { display: flex; flex-direction: column; gap: .4rem; }
+  .field label { font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-light); font-weight: 400; }
+  .req { color: var(--gold); }
+  input[type="text"], input[type="email"], input[type="number"], input[type="date"], select, textarea { background: var(--sand); border: 1px solid var(--sand-dark); border-radius: var(--radius); padding: .6rem .85rem; font-family: 'Jost', sans-serif; font-size: .875rem; font-weight: 300; color: var(--ink); width: 100%; transition: border-color .15s; -webkit-appearance: none; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--gold); background: var(--warm-white); }
+  input::placeholder, textarea::placeholder { color: var(--ink-light); opacity: .6; }
+  .mono-input { font-family: 'DM Mono', monospace; font-size: .8rem; letter-spacing: .04em; }
+  .field-note { font-size: .7rem; color: var(--ink-light); margin-top: .2rem; }
+
+  /* SKU */
+  .sku-row { display: flex; align-items: center; gap: .75rem; margin-top: .5rem; }
+  .sku-box { flex: 1; background: var(--ink); color: var(--gold-light); font-family: 'DM Mono', monospace; font-size: 1.1rem; letter-spacing: .12em; padding: .75rem 1.25rem; border-radius: var(--radius); font-weight: 400; }
+  .copy-btn { background: transparent; border: 1px solid var(--sand-dark); border-radius: var(--radius); padding: .65rem 1rem; font-family: 'Jost', sans-serif; font-size: .75rem; letter-spacing: .1em; color: var(--ink-mid); cursor: pointer; transition: all .15s; white-space: nowrap; }
+  .copy-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* PRICING */
+  .price-log-row { display: flex; align-items: stretch; gap: .75rem; margin-bottom: .75rem; }
+  .price-wrap { position: relative; flex: 1; }
+  .price-wrap .currency { position: absolute; left: .85rem; top: 50%; transform: translateY(-50%); font-size: .8rem; color: var(--ink-light); pointer-events: none; }
+  .price-wrap input { padding-left: 1.6rem; }
+  .log-btn { background: var(--gold); color: var(--warm-white); border: none; border-radius: var(--radius); padding: .6rem 1.25rem; font-family: 'Jost', sans-serif; font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; white-space: nowrap; transition: all .15s; }
+  .log-btn:hover { background: var(--gold-light); }
+  .current-cost-badge { display: inline-flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--ink-mid); background: var(--gold-pale); border: 1px solid var(--sand-dark); border-radius: var(--radius); padding: .4rem .85rem; margin-bottom: 1rem; }
+  .current-cost-badge strong { font-family: 'DM Mono', monospace; font-weight: 500; color: var(--ink); }
+  .history-wrap { border: 1px solid var(--sand-mid); border-radius: var(--radius); overflow: hidden; margin-top: .5rem; }
+  .history-header { background: var(--sand-mid); padding: .5rem 1rem; font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-light); display: flex; justify-content: space-between; }
+  .history-item { display: flex; justify-content: space-between; align-items: center; padding: .6rem 1rem; border-bottom: 1px solid var(--sand-mid); font-size: .82rem; gap: 1rem; }
+  .history-item:last-child { border-bottom: none; }
+  .history-date { color: var(--ink-light); font-size: .75rem; }
+  .history-price { font-family: 'DM Mono', monospace; font-weight: 500; }
+  .badge { font-size: .65rem; padding: 2px 8px; border-radius: 20px; letter-spacing: .04em; }
+  .badge-up { background: var(--danger-bg); color: var(--danger); }
+  .badge-dn { background: var(--ok-bg); color: var(--ok); }
+  .badge-cur { background: var(--gold-pale); color: var(--warn); }
+  .badge-order { background: var(--blue-bg); color: var(--blue); }
+  .metrics-row { display: grid; grid-template-columns: repeat(3,1fr); gap: .75rem; margin-top: 1.25rem; }
+  .metric-tile { background: var(--sand); border: 1px solid var(--sand-dark); border-radius: var(--radius); padding: .85rem 1rem; text-align: center; }
+  .metric-val { font-family: 'DM Mono', monospace; font-size: 1.2rem; font-weight: 400; color: var(--ink); display: block; margin-bottom: .25rem; }
+  .metric-val.pos { color: var(--ok); }
+  .metric-val.neg { color: var(--danger); }
+  .metric-lbl { font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-light); }
+
+  /* INVENTORY */
+  .stock-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; }
+  .stock-tile { background: var(--sand); border: 1px solid var(--sand-dark); border-radius: var(--radius-lg); padding: 1.25rem; }
+  .stock-tile-label { font-size: .65rem; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-light); margin-bottom: .5rem; }
+  .stock-num { font-family: 'Cormorant Garamond', serif; font-size: 3rem; font-weight: 300; line-height: 1; color: var(--ink); margin-bottom: .75rem; }
+  .stepper { display: flex; align-items: center; gap: .5rem; }
+  .step-btn { width: 30px; height: 30px; border: 1px solid var(--sand-dark); border-radius: var(--radius); background: var(--warm-white); color: var(--ink); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .12s; flex-shrink: 0; }
+  .step-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .stepper input { width: 56px; text-align: center; font-family: 'DM Mono', monospace; font-size: .9rem; font-weight: 500; padding: .35rem; }
+  .stock-status { display: inline-flex; align-items: center; gap: .4rem; font-size: .7rem; padding: 3px 10px; border-radius: 20px; letter-spacing: .04em; margin-top: .75rem; }
+  .status-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  .status-ok { background: var(--ok-bg); color: var(--ok); }
+  .status-ok .status-dot { background: var(--ok); }
+  .status-low { background: var(--warn-bg); color: var(--warn); }
+  .status-low .status-dot { background: var(--warn); }
+  .status-out { background: var(--danger-bg); color: var(--danger); }
+  .status-out .status-dot { background: var(--danger); }
+  .status-order { background: var(--blue-bg); color: var(--blue); }
+  .status-order .status-dot { background: var(--blue); }
+  .total-banner { background: var(--ink); color: var(--sand); border-radius: var(--radius); padding: .85rem 1.25rem; display: flex; justify-content: space-between; align-items: center; font-size: .8rem; letter-spacing: .04em; margin-bottom: 1.5rem; }
+  .total-banner strong { font-family: 'DM Mono', monospace; font-size: 1.1rem; color: var(--gold-light); }
+  .order-log-item { display: flex; justify-content: space-between; align-items: flex-start; padding: .75rem 1rem; border-bottom: 1px solid var(--sand-mid); gap: 1rem; }
+  .order-log-item:last-child { border-bottom: none; }
+  .order-num { font-family: 'DM Mono', monospace; font-size: .85rem; font-weight: 500; }
+  .order-meta { font-size: .72rem; color: var(--ink-light); margin-top: .2rem; }
+
+  /* ===== CATALOG VIEW ===== */
+  .catalog-page { max-width: 1100px; margin: 0 auto; padding: 2.5rem 2rem 5rem; }
+  .catalog-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.75rem; gap: 1rem; flex-wrap: wrap; }
+  .catalog-title { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 400; letter-spacing: .04em; }
+  .catalog-count { font-size: .75rem; color: var(--ink-light); letter-spacing: .08em; margin-top: .15rem; }
+  .catalog-toolbar-right { display: flex; align-items: center; gap: .75rem; }
+  .filter-select { background: var(--warm-white); border: 1px solid var(--sand-dark); border-radius: var(--radius); padding: .45rem .85rem; font-family: 'Jost', sans-serif; font-size: .8rem; color: var(--ink-mid); cursor: pointer; }
+  .catalog-search { background: var(--warm-white); border: 1px solid var(--sand-dark); border-radius: var(--radius); padding: .45rem .85rem; font-family: 'Jost', sans-serif; font-size: .8rem; color: var(--ink); width: 200px; }
+  .catalog-search::placeholder { color: var(--ink-light); opacity: .6; }
+  .catalog-search:focus { outline: none; border-color: var(--gold); }
+
+  .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.25rem; }
+  .catalog-card { background: var(--warm-white); border: 1px solid var(--sand-dark); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow); cursor: pointer; transition: transform .15s, box-shadow .15s; }
+  .catalog-card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(28,24,20,.1); }
+  .catalog-card-img { width: 100%; aspect-ratio: 1/1; background: var(--sand); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .catalog-card-img img { width: 100%; height: 100%; object-fit: cover; }
+  .catalog-card-img-placeholder { display: flex; flex-direction: column; align-items: center; gap: .4rem; }
+  .catalog-card-img-placeholder svg { width: 24px; height: 24px; stroke: var(--sand-dark); }
+  .catalog-card-img-placeholder span { font-size: .65rem; letter-spacing: .08em; color: var(--sand-dark); }
+  .catalog-card-body { padding: .85rem 1rem; }
+  .catalog-card-sku { font-family: 'DM Mono', monospace; font-size: .68rem; color: var(--gold); letter-spacing: .06em; margin-bottom: .25rem; }
+  .catalog-card-title { font-size: .88rem; font-weight: 400; color: var(--ink); margin-bottom: .5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .catalog-card-meta { display: flex; justify-content: space-between; align-items: center; font-size: .72rem; }
+  .catalog-card-cost { color: var(--ink-light); font-family: 'DM Mono', monospace; }
+  .catalog-card-stock { display: inline-flex; align-items: center; gap: 4px; font-size: .65rem; padding: 2px 7px; border-radius: 20px; }
+  .catalog-card-actions { display: flex; border-top: 1px solid var(--sand-mid); }
+  .catalog-card-btn { flex: 1; background: transparent; border: none; padding: .55rem; font-family: 'Jost', sans-serif; font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-light); cursor: pointer; transition: all .12s; }
+  .catalog-card-btn:hover { background: var(--sand); color: var(--ink); }
+  .catalog-card-btn.del:hover { color: var(--danger); }
+  .catalog-card-btn + .catalog-card-btn { border-left: 1px solid var(--sand-mid); }
+
+  .empty-catalog { text-align: center; padding: 4rem 2rem; color: var(--ink-light); }
+  .empty-catalog svg { width: 48px; height: 48px; stroke: var(--sand-dark); margin-bottom: 1rem; }
+  .empty-catalog p { font-size: .9rem; margin-bottom: .5rem; }
+  .empty-catalog span { font-size: .78rem; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 2rem; right: 2rem; background: var(--ink); color: var(--sand); padding: .75rem 1.25rem; border-radius: var(--radius); font-size: .82rem; letter-spacing: .04em; z-index: 9999; opacity: 0; transform: translateY(8px); transition: all .25s; pointer-events: none; display: flex; align-items: center; gap: .5rem; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.ok { border-left: 3px solid #6fcf8a; }
+  .toast.err { border-left: 3px solid var(--danger); }
+
+  /* GOOGLE DRIVE SETUP BANNER */
+  .setup-banner { background: var(--gold-pale); border: 1px solid var(--sand-dark); border-radius: var(--radius); padding: .85rem 1.25rem; margin-bottom: 1.5rem; font-size: .82rem; color: var(--ink-mid); display: flex; align-items: flex-start; gap: .75rem; }
+  .setup-banner.hidden { display: none; }
+  .setup-banner-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+  .setup-banner a { color: var(--gold); text-decoration: underline; cursor: pointer; }
+  .setup-close { margin-left: auto; background: none; border: none; color: var(--ink-light); cursor: pointer; font-size: 1rem; padding: 0 0 0 .5rem; flex-shrink: 0; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  @media (max-width: 768px) {
+    .page { grid-template-columns: 1fr; }
+    .sidebar { position: static; }
+    .col-2, .col-3 { grid-template-columns: 1fr 1fr; }
+    .stock-tiles { grid-template-columns: 1fr; }
+    .metrics-row { grid-template-columns: 1fr; }
+    .catalog-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  }
+  @media (max-width: 480px) {
+    .col-2, .col-3 { grid-template-columns: 1fr; }
+    .page { padding: 1.25rem 1rem 4rem; }
+    .topbar { padding: 0 1rem; }
+    .catalog-page { padding: 1.25rem 1rem 4rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div>
+    <div class="topbar-brand">Inventory</div>
+    <div class="topbar-sub">Product Module</div>
+  </div>
+  <div class="topbar-right">
+    <div class="topbar-sku" id="topbar-sku">— — —</div>
+    <button class="topbar-view-btn active-view" onclick="showView('form')" id="btn-form-view">+ New Product</button>
+    <button class="topbar-view-btn" onclick="showView('catalog')" id="btn-catalog-view">Catalog</button>
+    <button class="gdrive-btn" id="gdrive-btn" onclick="backupToDrive()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 19h20L12 2z" opacity=".4"/><path d="M2 19l6-10 4 7H2z" opacity=".6"/><path d="M22 19l-6-10-4 7h10z"/>
+      </svg>
+      <span id="gdrive-label">Back up to Drive</span>
+    </button>
+  </div>
+</div>
+
+<!-- FORM VIEW -->
+<div class="view active" id="view-form">
+<div class="page">
+  <aside class="sidebar">
+    <div class="sidebar-label">Sections</div>
+    <button class="nav-item active" onclick="switchPanel('product')"><span class="nav-dot"></span> Product</button>
+    <button class="nav-item" onclick="switchPanel('supplier')"><span class="nav-dot"></span> Supplier</button>
+    <button class="nav-item" onclick="switchPanel('pricing')"><span class="nav-dot"></span> Pricing</button>
+    <button class="nav-item" onclick="switchPanel('inventory')"><span class="nav-dot"></span> Inventory</button>
+    <div class="sidebar-divider"></div>
+    <span class="img-label">Product image</span>
+    <div class="img-upload-wrap">
+      <div class="img-drop-zone" id="img-drop-zone" onclick="document.getElementById('img-input').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+        <div class="img-placeholder">
+          <div class="img-placeholder-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </div>
+          <span>Click or drag<br>to upload</span>
+        </div>
+        <img class="img-preview" id="img-preview" alt="Product image">
+      </div>
+      <div class="img-actions" id="img-actions">
+        <button class="img-action-btn" onclick="document.getElementById('img-input').click()">Replace</button>
+        <button class="img-action-btn danger" onclick="removeImage()">Remove</button>
+      </div>
+      <input type="file" id="img-input" class="img-input" accept="image/*" onchange="handleFileSelect(event)">
+    </div>
+    <div class="sidebar-divider"></div>
+    <button class="save-btn" id="save-btn" onclick="saveProduct()">Save Product</button>
+    <button class="clear-btn" onclick="clearForm()">Clear Form</button>
+  </aside>
+
+  <main class="main">
+    <!-- PRODUCT -->
+    <div class="panel active" id="panel-product">
+      <div class="panel-header"><div class="panel-title">Product</div><div class="panel-subtitle">Identity &amp; details</div></div>
+      <div class="panel-body">
+        <div class="section">
+          <div class="section-label">SKU Generation</div>
+          <div class="field-grid col-2">
+            <div class="field"><label>Category <span class="req">*</span></label>
+              <select id="category" onchange="generateSKU()">
+                <option value="">Select category…</option>
+                <option value="NK">Necklace</option>
+                <option value="ER">Earrings</option>
+                <option value="BR">Bracelet</option>
+                <option value="BG">Bag</option>
+                <option value="CH">Charm</option>
+              </select>
+            </div>
+            <div class="field"><label>Material code</label>
+              <select id="mat-code" onchange="generateSKU()">
+                <option value="GP">Gold-plated</option>
+                <option value="GF">Gold-filled</option>
+                <option value="SV">Silver</option>
+                <option value="SS">Stainless steel</option>
+                <option value="LT">Leather</option>
+                <option value="CN">Canvas</option>
+                <option value="OT">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="sku-row">
+            <div class="sku-box" id="sku-display">— — —</div>
+            <button class="copy-btn" onclick="copySKU()">Copy SKU</button>
+          </div>
+          <div class="field-note" style="margin-top:.5rem">Format: CAT-MAT-XXXX · e.g. NK-GP-0042</div>
+        </div>
+        <div class="section">
+          <div class="section-label">Product Details</div>
+          <div class="field-grid">
+            <div class="field span-full"><label>Title <span class="req">*</span></label><input type="text" id="title" placeholder="e.g. Celestine layering necklace"></div>
+          </div>
+          <div class="field-grid col-2" style="margin-top:1rem">
+            <div class="field"><label>Material</label><input type="text" id="material" placeholder="e.g. 18k gold-plated brass"></div>
+            <div class="field"><label>Stone 1</label><input type="text" id="stone1" placeholder="e.g. Labradorite"></div>
+            <div class="field"><label>Stone 2</label><input type="text" id="stone2" placeholder="e.g. Freshwater pearl"></div>
+            <div class="field"><label>Stone 3</label><input type="text" id="stone3" placeholder="e.g. Smoky quartz"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUPPLIER -->
+    <div class="panel" id="panel-supplier">
+      <div class="panel-header"><div class="panel-title">Supplier</div><div class="panel-subtitle">Contact &amp; ordering info</div></div>
+      <div class="panel-body">
+        <div class="section">
+          <div class="section-label">Contact</div>
+          <div class="field-grid col-2">
+            <div class="field"><label>Supplier name</label><input type="text" id="sup-name" placeholder="e.g. Artisan Gold Milano"></div>
+            <div class="field"><label>Contact name</label><input type="text" id="sup-contact" placeholder="e.g. Marco Ferretti"></div>
+            <div class="field"><label>Email</label><input type="email" id="sup-email" placeholder="supplier@email.com"></div>
+            <div class="field"><label>Phone / WhatsApp</label><input type="text" id="sup-phone" placeholder="+39 02 …"></div>
+            <div class="field"><label>Country / Region</label><input type="text" id="sup-country" placeholder="e.g. Italy"></div>
+            <div class="field"><label>Supplier SKU</label><input type="text" id="sup-sku" class="mono-input" placeholder="Their style / ref code"></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-label">Notes</div>
+          <div class="field"><label>Ordering notes</label><textarea id="sup-notes" rows="3" placeholder="MOQ, lead times, packaging, payment terms…" style="resize:vertical"></textarea></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRICING -->
+    <div class="panel" id="panel-pricing">
+      <div class="panel-header"><div class="panel-title">Pricing</div><div class="panel-subtitle">Cost, history &amp; profit</div></div>
+      <div class="panel-body">
+        <div class="section">
+          <div class="section-label">Supplier Cost</div>
+          <div id="current-cost-badge" style="display:none" class="current-cost-badge">Current cost: <strong id="current-cost-val">$0.00</strong></div>
+          <div class="price-log-row">
+            <div class="price-wrap"><span class="currency">$</span><input type="number" id="new-cost" placeholder="0.00" step="0.01" min="0" oninput="calcProfit()"></div>
+            <button class="log-btn" onclick="logPrice()">Log Price</button>
+          </div>
+          <div class="field-note">Log the latest supplier price each time you receive an order.</div>
+          <div id="price-history-wrap" style="display:none; margin-top:1.25rem">
+            <div class="history-wrap">
+              <div class="history-header"><span>Price history</span><span id="history-count">—</span></div>
+              <div id="history-list"></div>
+            </div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-label">Retail &amp; Wholesale</div>
+          <div class="field-grid col-2">
+            <div class="field"><label>Retail price</label>
+              <div style="position:relative"><span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);font-size:.8rem;color:var(--ink-light);pointer-events:none">$</span><input type="number" id="retail" placeholder="0.00" step="0.01" min="0" oninput="calcProfit()" style="padding-left:1.6rem"></div>
+            </div>
+            <div class="field"><label>Wholesale price</label>
+              <div style="position:relative"><span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);font-size:.8rem;color:var(--ink-light);pointer-events:none">$</span><input type="number" id="wholesale" placeholder="0.00" step="0.01" min="0" oninput="calcProfit()" style="padding-left:1.6rem"></div>
+            </div>
+          </div>
+          <div class="metrics-row" id="profit-row" style="display:none">
+            <div class="metric-tile"><span class="metric-val" id="retail-margin">—</span><div class="metric-lbl">Retail margin</div></div>
+            <div class="metric-tile"><span class="metric-val" id="retail-profit">—</span><div class="metric-lbl">Retail profit</div></div>
+            <div class="metric-tile"><span class="metric-val" id="ws-margin">—</span><div class="metric-lbl">Wholesale margin</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INVENTORY -->
+    <div class="panel" id="panel-inventory">
+      <div class="panel-header"><div class="panel-title">Inventory</div><div class="panel-subtitle">Stock levels &amp; orders</div></div>
+      <div class="panel-body">
+        <div class="section">
+          <div class="section-label">Stock Levels</div>
+          <div class="stock-tiles">
+            <div class="stock-tile">
+              <div class="stock-tile-label">In stock</div>
+              <div class="stock-num" id="stock-display">0</div>
+              <div class="stepper">
+                <button class="step-btn" onclick="adjustStock(-1)">−</button>
+                <input type="number" id="stock-input" value="0" min="0" step="1" oninput="setStock(this.value)">
+                <button class="step-btn" onclick="adjustStock(1)">+</button>
+              </div>
+              <div id="stock-status" class="stock-status status-out"><span class="status-dot"></span> Out of stock</div>
+            </div>
+            <div class="stock-tile">
+              <div class="stock-tile-label">On order</div>
+              <div class="stock-num" id="order-display">0</div>
+              <div class="stepper">
+                <button class="step-btn" onclick="adjustOrder(-1)">−</button>
+                <input type="number" id="order-input" value="0" min="0" step="1" oninput="setOrder(this.value)">
+                <button class="step-btn" onclick="adjustOrder(1)">+</button>
+              </div>
+              <div id="order-status" class="stock-status status-order" style="display:none"><span class="status-dot"></span><span id="order-status-text"></span></div>
+            </div>
+          </div>
+          <div class="total-banner"><span>Total available once order arrives</span><strong id="total-available">0</strong></div>
+        </div>
+        <div class="section">
+          <div class="section-label">Order Confirmation</div>
+          <div class="field-grid col-2">
+            <div class="field span-full"><label>Confirmation / PO number</label>
+              <div style="display:flex;gap:.75rem">
+                <input type="text" id="confirm-num" class="mono-input" placeholder="e.g. FAC-2026-00834" style="flex:1">
+                <button class="log-btn" onclick="logOrder()">Log Order</button>
+              </div>
+              <div class="field-note">Factory or supplier confirmation number</div>
+            </div>
+            <div class="field"><label>Order date</label><input type="date" id="order-date"></div>
+            <div class="field"><label>Expected arrival</label><input type="date" id="eta-date"></div>
+          </div>
+          <div id="order-log-wrap" style="display:none; margin-top:1.25rem">
+            <div class="history-wrap">
+              <div class="history-header"><span>Order history</span><span id="order-log-count">—</span></div>
+              <div id="order-log-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- CATALOG VIEW -->
+<div class="view" id="view-catalog">
+<div class="catalog-page">
+  <div id="setup-banner" class="setup-banner">
+    <span class="setup-banner-icon">ℹ️</span>
+    <span>To enable Google Drive backup, open this file in a text editor and replace <strong>YOUR_CLIENT_ID</strong> near the bottom with your Google OAuth Client ID. <a onclick="document.getElementById('setup-banner').classList.add('hidden')">Dismiss</a></span>
+    <button class="setup-close" onclick="document.getElementById('setup-banner').classList.add('hidden')">✕</button>
+  </div>
+  <div class="catalog-toolbar">
+    <div>
+      <div class="catalog-title">Product Catalog</div>
+      <div class="catalog-count" id="catalog-count">0 products</div>
+    </div>
+    <div class="catalog-toolbar-right">
+      <select class="filter-select" id="cat-filter" onchange="renderCatalog()">
+        <option value="">All categories</option>
+        <option value="NK">Necklaces</option>
+        <option value="ER">Earrings</option>
+        <option value="BR">Bracelets</option>
+        <option value="BG">Bags</option>
+        <option value="CH">Charms</option>
+      </select>
+      <input class="catalog-search" id="catalog-search" type="text" placeholder="Search title or SKU…" oninput="renderCatalog()">
+    </div>
+  </div>
+  <div class="catalog-grid" id="catalog-grid"></div>
+</div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'inv_products_v1';
+const COUNTER_KEY = 'inv_sku_counter_v1';
+let products = [];
+let skuCounter = 42;
+let priceHistory = [], currentCost = null, orderLog = [];
+let stockQty = 0, orderQty = 0;
+let editingId = null;
+
+// ── PERSISTENCE ────────────────────────────────────────────────────────
+function loadFromStorage() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) products = JSON.parse(saved);
+    const cnt = localStorage.getItem(COUNTER_KEY);
+    if (cnt) skuCounter = parseInt(cnt);
+  } catch(e) {}
+}
+function saveToStorage() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+    localStorage.setItem(COUNTER_KEY, String(skuCounter));
+  } catch(e) { showToast('Storage full — consider exporting.', 'err'); }
+}
+
+// ── VIEW SWITCHING ────────────────────────────────────────────────────
+function showView(name) {
+  document.getElementById('view-form').classList.toggle('active', name === 'form');
+  document.getElementById('view-catalog').classList.toggle('active', name === 'catalog');
+  document.getElementById('btn-form-view').classList.toggle('active-view', name === 'form');
+  document.getElementById('btn-catalog-view').classList.toggle('active-view', name === 'catalog');
+  if (name === 'catalog') renderCatalog();
+}
+
+// ── PANELS ─────────────────────────────────────────────────────────────
+function switchPanel(name) {
+  ['product','supplier','pricing','inventory'].forEach(p => {
+    document.getElementById('panel-'+p).classList.toggle('active', p === name);
+  });
+  document.querySelectorAll('.nav-item').forEach((b, i) => {
+    b.classList.toggle('active', ['product','supplier','pricing','inventory'][i] === name);
+  });
+}
+
+// ── SKU ────────────────────────────────────────────────────────────────
+function generateSKU() {
+  const cat = document.getElementById('category').value;
+  const mat = document.getElementById('mat-code').value;
+  if (!cat) { document.getElementById('sku-display').textContent = '— — —'; document.getElementById('topbar-sku').textContent = '— — —'; return; }
+  const num = String(skuCounter).padStart(4,'0');
+  const sku = cat+'-'+mat+'-'+num;
+  document.getElementById('sku-display').textContent = sku;
+  document.getElementById('topbar-sku').textContent = sku;
+}
+function copySKU() {
+  const sku = document.getElementById('sku-display').textContent;
+  if (sku === '— — —') return;
+  navigator.clipboard.writeText(sku).catch(()=>{});
+  const btn = event.currentTarget; btn.textContent = 'Copied!';
+  setTimeout(()=> btn.textContent = 'Copy SKU', 1500);
+}
+
+// ── PRICING ────────────────────────────────────────────────────────────
+function logPrice() {
+  const val = parseFloat(document.getElementById('new-cost').value);
+  if (isNaN(val) || val <= 0) return;
+  const prev = currentCost; currentCost = val;
+  priceHistory.unshift({ price: val, date: new Date().toISOString(), prev });
+  renderHistory(); calcProfit();
+  document.getElementById('new-cost').value = '';
+  document.getElementById('current-cost-badge').style.display = 'inline-flex';
+  document.getElementById('current-cost-val').textContent = '$'+val.toFixed(2);
+}
+function renderHistory() {
+  const wrap = document.getElementById('price-history-wrap');
+  if (!priceHistory.length) { wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  document.getElementById('history-count').textContent = priceHistory.length+(priceHistory.length===1?' entry':' entries');
+  document.getElementById('history-list').innerHTML = priceHistory.map((e,i)=>{
+    const d = new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    let delta = '';
+    if (e.prev!=null) { const diff=e.price-e.prev; const pct=((diff/e.prev)*100).toFixed(1); delta='<span class="badge '+(diff>0?'badge-up':'badge-dn')+'">'+(diff>0?'+':'')+pct+'%</span>'; }
+    const cur = i===0?'<span class="badge badge-cur">current</span>':'';
+    return `<div class="history-item"><span class="history-date">${d}</span><div style="display:flex;align-items:center;gap:.5rem">${delta}<span class="history-price">$${e.price.toFixed(2)}</span>${cur}</div></div>`;
+  }).join('');
+}
+function calcProfit() {
+  const cost = currentCost || parseFloat(document.getElementById('new-cost').value)||0;
+  const retail = parseFloat(document.getElementById('retail').value)||0;
+  const ws = parseFloat(document.getElementById('wholesale').value)||0;
+  const row = document.getElementById('profit-row');
+  if (cost>0&&(retail>0||ws>0)) {
+    row.style.display='grid';
+    if (retail>0) { const rp=retail-cost; const rm=((rp/retail)*100).toFixed(1); document.getElementById('retail-profit').textContent='$'+rp.toFixed(2); document.getElementById('retail-profit').className='metric-val '+(rp>=0?'pos':'neg'); document.getElementById('retail-margin').textContent=rm+'%'; document.getElementById('retail-margin').className='metric-val '+(parseFloat(rm)>=0?'pos':'neg'); }
+    if (ws>0) { const wp=ws-cost; const wm=((wp/ws)*100).toFixed(1); document.getElementById('ws-margin').textContent=wm+'%'; document.getElementById('ws-margin').className='metric-val '+(parseFloat(wm)>=0?'pos':'neg'); }
+  } else { row.style.display='none'; }
+}
+
+// ── STOCK ──────────────────────────────────────────────────────────────
+function setStock(val) { stockQty=Math.max(0,parseInt(val)||0); document.getElementById('stock-input').value=stockQty; document.getElementById('stock-display').textContent=stockQty; updateStockStatus(); }
+function adjustStock(d) { setStock(stockQty+d); }
+function setOrder(val) { orderQty=Math.max(0,parseInt(val)||0); document.getElementById('order-input').value=orderQty; document.getElementById('order-display').textContent=orderQty; updateStockStatus(); }
+function adjustOrder(d) { setOrder(orderQty+d); }
+function updateStockStatus() {
+  const s = document.getElementById('stock-status'), o = document.getElementById('order-status');
+  document.getElementById('total-available').textContent = stockQty+orderQty;
+  if (stockQty===0) { s.className='stock-status status-out'; s.innerHTML='<span class="status-dot"></span> Out of stock'; }
+  else if (stockQty<=3) { s.className='stock-status status-low'; s.innerHTML='<span class="status-dot"></span> Low stock'; }
+  else { s.className='stock-status status-ok'; s.innerHTML='<span class="status-dot"></span> In stock'; }
+  if (orderQty>0) { o.style.display='inline-flex'; o.className='stock-status status-order'; o.innerHTML='<span class="status-dot"></span> '+orderQty+' units incoming'; }
+  else { o.style.display='none'; }
+}
+function logOrder() {
+  const num = document.getElementById('confirm-num').value.trim(); if (!num) return;
+  orderLog.unshift({ num, orderDate: document.getElementById('order-date').value, eta: document.getElementById('eta-date').value, qty: orderQty, logged: new Date().toISOString() });
+  renderOrderLog(); document.getElementById('confirm-num').value='';
+}
+function renderOrderLog() {
+  const wrap = document.getElementById('order-log-wrap');
+  if (!orderLog.length) { wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  document.getElementById('order-log-count').textContent = orderLog.length+(orderLog.length===1?' order':' orders');
+  document.getElementById('order-log-list').innerHTML = orderLog.map((o,i)=>{
+    const logged = new Date(o.logged).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const eta = o.eta?' · ETA '+new Date(o.eta+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+    const qty = o.qty>0?' · '+o.qty+' units':'';
+    const cur = i===0?'<span class="badge badge-cur" style="flex-shrink:0">latest</span>':'';
+    return `<div class="order-log-item"><div><div class="order-num">${o.num}</div><div class="order-meta">Logged ${logged}${eta}${qty}</div></div>${cur}</div>`;
+  }).join('');
+}
+
+// ── SAVE / LOAD PRODUCT ───────────────────────────────────────────────
+function collectProduct() {
+  return {
+    id: editingId || Date.now(),
+    sku: document.getElementById('sku-display').textContent,
+    category: document.getElementById('category').value,
+    matCode: document.getElementById('mat-code').value,
+    title: document.getElementById('title').value.trim(),
+    material: document.getElementById('material').value.trim(),
+    stone1: document.getElementById('stone1').value.trim(),
+    stone2: document.getElementById('stone2').value.trim(),
+    stone3: document.getElementById('stone3').value.trim(),
+    supName: document.getElementById('sup-name').value.trim(),
+    supContact: document.getElementById('sup-contact').value.trim(),
+    supEmail: document.getElementById('sup-email').value.trim(),
+    supPhone: document.getElementById('sup-phone').value.trim(),
+    supCountry: document.getElementById('sup-country').value.trim(),
+    supSku: document.getElementById('sup-sku').value.trim(),
+    supNotes: document.getElementById('sup-notes').value.trim(),
+    retail: parseFloat(document.getElementById('retail').value)||0,
+    wholesale: parseFloat(document.getElementById('wholesale').value)||0,
+    currentCost,
+    priceHistory,
+    stockQty,
+    orderQty,
+    orderLog,
+    image: document.getElementById('img-preview').src || null,
+    savedAt: new Date().toISOString()
+  };
+}
+function saveProduct() {
+  const sku = document.getElementById('sku-display').textContent;
+  const title = document.getElementById('title').value.trim();
+  if (!sku || sku==='— — —') { showToast('Select a category to generate a SKU first.','err'); return; }
+  if (!title) { showToast('Add a product title before saving.','err'); return; }
+  const product = collectProduct();
+  if (editingId) {
+    const idx = products.findIndex(p=>p.id===editingId);
+    if (idx>-1) products[idx]=product;
+    editingId=null;
+  } else {
+    products.push(product);
+    skuCounter++;
+  }
+  saveToStorage();
+  const btn = document.getElementById('save-btn');
+  btn.textContent = 'Saved ✓'; btn.classList.add('success');
+  setTimeout(()=>{ btn.textContent='Save Product'; btn.classList.remove('success'); }, 2200);
+  showToast('Product saved — '+sku,'ok');
+  clearForm();
+}
+function editProduct(id) {
+  const p = products.find(x=>x.id===id); if (!p) return;
+  editingId = p.id;
+  document.getElementById('category').value = p.category||'';
+  document.getElementById('mat-code').value = p.matCode||'GP';
+  document.getElementById('sku-display').textContent = p.sku;
+  document.getElementById('topbar-sku').textContent = p.sku;
+  document.getElementById('title').value = p.title||'';
+  document.getElementById('material').value = p.material||'';
+  document.getElementById('stone1').value = p.stone1||'';
+  document.getElementById('stone2').value = p.stone2||'';
+  document.getElementById('stone3').value = p.stone3||'';
+  document.getElementById('sup-name').value = p.supName||'';
+  document.getElementById('sup-contact').value = p.supContact||'';
+  document.getElementById('sup-email').value = p.supEmail||'';
+  document.getElementById('sup-phone').value = p.supPhone||'';
+  document.getElementById('sup-country').value = p.supCountry||'';
+  document.getElementById('sup-sku').value = p.supSku||'';
+  document.getElementById('sup-notes').value = p.supNotes||'';
+  document.getElementById('retail').value = p.retail||'';
+  document.getElementById('wholesale').value = p.wholesale||'';
+  currentCost = p.currentCost||null;
+  priceHistory = (p.priceHistory||[]).map(e=>({...e,date:new Date(e.date)}));
+  stockQty = p.stockQty||0; orderQty = p.orderQty||0;
+  orderLog = (p.orderLog||[]).map(o=>({...o,logged:new Date(o.logged)}));
+  document.getElementById('stock-input').value = stockQty;
+  document.getElementById('stock-display').textContent = stockQty;
+  document.getElementById('order-input').value = orderQty;
+  document.getElementById('order-display').textContent = orderQty;
+  if (currentCost) { document.getElementById('current-cost-badge').style.display='inline-flex'; document.getElementById('current-cost-val').textContent='$'+currentCost.toFixed(2); }
+  if (p.image) { document.getElementById('img-preview').src=p.image; document.getElementById('img-drop-zone').classList.add('has-image'); document.getElementById('img-actions').style.display='flex'; }
+  renderHistory(); renderOrderLog(); updateStockStatus(); calcProfit();
+  document.getElementById('save-btn').textContent = 'Update Product';
+  showView('form'); switchPanel('product');
+}
+function deleteProduct(id) {
+  if (!confirm('Delete this product? This cannot be undone.')) return;
+  products = products.filter(p=>p.id!==id);
+  saveToStorage(); renderCatalog();
+  showToast('Product deleted.','ok');
+}
+function clearForm() {
+  editingId=null;
+  ['title','material','stone1','stone2','stone3','sup-name','sup-contact','sup-email','sup-phone','sup-country','sup-sku','sup-notes','new-cost','retail','wholesale','confirm-num','order-date','eta-date'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('category').value='';
+  document.getElementById('sku-display').textContent='— — —';
+  document.getElementById('topbar-sku').textContent='— — —';
+  priceHistory=[]; currentCost=null; orderLog=[];
+  stockQty=0; orderQty=0;
+  document.getElementById('stock-input').value=0; document.getElementById('order-input').value=0;
+  document.getElementById('stock-display').textContent=0; document.getElementById('order-display').textContent=0;
+  document.getElementById('price-history-wrap').style.display='none';
+  document.getElementById('profit-row').style.display='none';
+  document.getElementById('order-log-wrap').style.display='none';
+  document.getElementById('current-cost-badge').style.display='none';
+  document.getElementById('save-btn').textContent='Save Product';
+  removeImage(); updateStockStatus(); generateSKU();
+}
+
+// ── CATALOG ────────────────────────────────────────────────────────────
+function renderCatalog() {
+  const grid = document.getElementById('catalog-grid');
+  const filter = document.getElementById('cat-filter').value;
+  const search = document.getElementById('catalog-search').value.toLowerCase();
+  let list = products.filter(p=>{
+    if (filter && p.category!==filter) return false;
+    if (search && !p.title.toLowerCase().includes(search) && !p.sku.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  document.getElementById('catalog-count').textContent = list.length+' product'+(list.length!==1?'s':'');
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty-catalog" style="grid-column:1/-1">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <p>${products.length===0?'No products yet':'No products match your filter'}</p>
+      <span>${products.length===0?'Fill out the form and hit Save Product to add your first item.':'Try clearing the search or filter.'}</span>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = list.map(p=>{
+    const imgHtml = (p.image && p.image !== 'null')
+      ? `<img src="${p.image}" alt="${p.title}" style="width:100%;height:100%;object-fit:cover">`
+      : `<div class="catalog-card-img-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span>No image</span></div>`;
+    const stockCls = p.stockQty===0?'status-out':p.stockQty<=3?'status-low':'status-ok';
+    const stockLbl = p.stockQty===0?'Out of stock':p.stockQty<=3?'Low ('+p.stockQty+')':p.stockQty+' in stock';
+    const cost = p.currentCost?'$'+p.currentCost.toFixed(2):'—';
+    return `<div class="catalog-card">
+      <div class="catalog-card-img">${imgHtml}</div>
+      <div class="catalog-card-body">
+        <div class="catalog-card-sku">${p.sku}</div>
+        <div class="catalog-card-title">${p.title}</div>
+        <div class="catalog-card-meta">
+          <span class="catalog-card-cost">${cost}</span>
+          <span class="catalog-card-stock stock-status ${stockCls}"><span class="status-dot"></span>${stockLbl}</span>
+        </div>
+      </div>
+      <div class="catalog-card-actions">
+        <button class="catalog-card-btn" onclick="editProduct(${p.id})">Edit</button>
+        <button class="catalog-card-btn del" onclick="deleteProduct(${p.id})">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── IMAGE ──────────────────────────────────────────────────────────────
+function handleFileSelect(e) { const f=e.target.files[0]; if(f) loadImage(f); }
+function handleDragOver(e) { e.preventDefault(); document.getElementById('img-drop-zone').classList.add('drag-over'); }
+function handleDragLeave(e) { document.getElementById('img-drop-zone').classList.remove('drag-over'); }
+function handleDrop(e) { e.preventDefault(); document.getElementById('img-drop-zone').classList.remove('drag-over'); const f=e.dataTransfer.files[0]; if(f&&f.type.startsWith('image/')) loadImage(f); }
+function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('img-preview').src = ev.target.result;
+    document.getElementById('img-drop-zone').classList.add('has-image');
+    document.getElementById('img-actions').style.display='flex';
+  };
+  reader.readAsDataURL(file);
+}
+function removeImage() {
+  document.getElementById('img-preview').src='';
+  document.getElementById('img-drop-zone').classList.remove('has-image');
+  document.getElementById('img-actions').style.display='none';
+  document.getElementById('img-input').value='';
+}
+
+// ── TOAST ──────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className='toast '+(type||'ok')+' show';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 3000);
+}
+
+// ── GOOGLE DRIVE BACKUP ────────────────────────────────────────────────
+// ⚙️  SETUP: Replace YOUR_CLIENT_ID below with your Google OAuth 2.0 Client ID.
+// Steps:
+//  1. Go to https://console.cloud.google.com/
+//  2. Create a project → APIs & Services → Enable "Google Drive API"
+//  3. OAuth consent screen → External → add your email as test user
+//  4. Credentials → Create OAuth Client ID → Web application
+//  5. Add this file's location to "Authorized JavaScript origins" (or use http://localhost for local)
+//  6. Copy the Client ID and paste it below.
+const GOOGLE_CLIENT_ID = '1045325701715-trdaftc5vpqql165sr30j64vae5bdsvb.apps.googleusercontent.com';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+let driveToken = null;
+let driveFileId = null;
+
+function backupToDrive() {
+  if (GOOGLE_CLIENT_ID === 'YOUR_CLIENT_ID') {
+    showToast('Add your Google Client ID first — see setup notes in the file.','err'); return;
+  }
+  if (!driveToken) { authAndBackup(); return; }
+  uploadToDrive();
+}
+
+function authAndBackup() {
+  const btn = document.getElementById('gdrive-btn');
+  btn.classList.add('syncing');
+  document.getElementById('gdrive-label').textContent = 'Connecting…';
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: DRIVE_SCOPE,
+    callback: (resp) => {
+      if (resp.error) { showToast('Google auth failed: '+resp.error,'err'); btn.classList.remove('syncing'); document.getElementById('gdrive-label').textContent='Back up to Drive'; return; }
+      driveToken = resp.access_token;
+      uploadToDrive();
+    }
+  });
+  client.requestAccessToken();
+}
+
+async function uploadToDrive() {
+  const btn = document.getElementById('gdrive-btn');
+  const label = document.getElementById('gdrive-label');
+  btn.classList.add('syncing'); label.textContent = 'Backing up…';
+  const data = { products, skuCounter, exportedAt: new Date().toISOString() };
+  const json = JSON.stringify(data, null, 2);
+  const filename = 'inventory-backup.json';
+  try {
+    if (!driveFileId) {
+      const searchRes = await fetch('https://www.googleapis.com/drive/v3/files?q=name%3D%27'+filename+'%27+and+trashed%3Dfalse&fields=files(id,name)', { headers: { Authorization: 'Bearer '+driveToken } });
+      const searchData = await searchRes.json();
+      if (searchData.files && searchData.files.length) driveFileId = searchData.files[0].id;
+    }
+    const blob = new Blob([json], {type:'application/json'});
+    let res;
+    if (driveFileId) {
+      res = await fetch('https://www.googleapis.com/upload/drive/v3/files/'+driveFileId+'?uploadType=media', { method:'PATCH', headers:{ Authorization:'Bearer '+driveToken, 'Content-Type':'application/json' }, body: blob });
+    } else {
+      const meta = JSON.stringify({ name: filename, mimeType:'application/json' });
+      const form = new FormData();
+      form.append('metadata', new Blob([meta],{type:'application/json'}));
+      form.append('file', blob);
+      res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method:'POST', headers:{ Authorization:'Bearer '+driveToken }, body: form });
+      const created = await res.clone().json();
+      driveFileId = created.id;
+    }
+    if (res.ok) {
+      btn.classList.remove('syncing'); btn.classList.add('synced');
+      label.textContent = 'Backed up ✓';
+      showToast('Saved to Google Drive — inventory-backup.json','ok');
+      setTimeout(()=>{ btn.classList.remove('synced'); label.textContent='Back up to Drive'; }, 4000);
+    } else { throw new Error('Upload failed'); }
+  } catch(e) {
+    btn.classList.remove('syncing'); label.textContent='Back up to Drive';
+    showToast('Drive backup failed. Try again.','err');
+  }
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────
+loadFromStorage();
+generateSKU();
+updateStockStatus();
+</script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+</body>
+</html>
