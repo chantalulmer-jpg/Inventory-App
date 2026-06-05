@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Mono:wght@300;400;500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -1281,12 +1282,13 @@ const DRIVE_SCOPE      = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE_FILENAME   = 'georgia-eve-inventory.json';
 const TOKEN_HEADROOM   = 5 * 60 * 1000; // refresh 5 min before expiry
 
-// Runtime state (not persisted — re-acquired each session via silent auth)
+// Runtime state
 let driveToken     = null;
-let driveTokenExp  = 0;          // epoch ms when token expires
-let driveFileId    = null;       // Drive file id once created/found
-let autoBackupTimer = null;      // debounce handle
+let driveTokenExp  = 0;
+let driveFileId    = null;
+let autoBackupTimer = null;
 let isBackingUp    = false;
+let tokenClient    = null;
 
 // ── Restore Drive file id from localStorage across page reloads
 function driveInit() {
@@ -1294,8 +1296,26 @@ function driveInit() {
   if (savedFileId) driveFileId = savedFileId;
   const lastTime = localStorage.getItem(DRIVE_LAST_KEY);
   if (lastTime) updateBackupTimeLabel(parseInt(lastTime));
-  // Attempt a silent sign-in on load so auto-backup works immediately
-  silentAuth();
+  // GIS library loads async — init token client once it's ready
+  window.addEventListener('load', () => {
+    try {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: DRIVE_SCOPE,
+        callback: (response) => {
+          if (response.error) {
+            setDriveState('error', 'Auth failed');
+            showToast('Drive sign-in failed: ' + response.error, 'err');
+            return;
+          }
+          applyToken({ accessToken: response.access_token, expiresIn: response.expires_in || 3600 });
+          uploadToDrive(true);
+        }
+      });
+    } catch(e) {
+      console.warn('GIS not loaded yet:', e);
+    }
+  });
 }
 
 // ── UI helpers ─────────────────────────────────────────────────────────
@@ -1314,108 +1334,20 @@ function updateBackupTimeLabel(epochMs) {
 // ── Manual button click ────────────────────────────────────────────────
 function handleDriveBtnClick() {
   if (!driveToken || Date.now() > driveTokenExp - TOKEN_HEADROOM) {
-    // Not signed in or token stale → kick off visible auth then backup
     authAndBackup();
   } else {
-    // Already signed in → immediate manual backup
     uploadToDrive(true);
   }
 }
 
-// ── Visible auth (user-initiated, opens popup) ─────────────────────────
+// ── Auth using Google Identity Services ───────────────────────────────
 function authAndBackup() {
-  if (GOOGLE_CLIENT_ID === 'YOUR_CLIENT_ID') {
-    showToast('Paste your Google Client ID into the file first.', 'err'); return;
+  if (!tokenClient) {
+    showToast('Google sign-in not ready yet — try again in a moment.', 'err');
+    return;
   }
-  const redirectUri = window.location.origin + window.location.pathname;
-  const params = new URLSearchParams({
-    client_id: GOOGLE_CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: 'token',
-    scope: DRIVE_SCOPE,
-    prompt: 'select_account'
-  });
-  const popup = window.open(
-    'https://accounts.google.com/o/oauth2/v2/auth?'+params,
-    'driveAuth',
-    'width=480,height=600,left=200,top=100'
-  );
-  if (!popup) { showToast('Allow popups for Drive sign-in.','err'); return; }
-  setDriveState('syncing','Waiting for sign-in…');
-  listenForToken(popup, true);
-}
-
-// ── Silent auth (no popup, refresh only) ──────────────────────────────
-function silentAuth() {
-  if (GOOGLE_CLIENT_ID === 'YOUR_CLIENT_ID') return;
-  const iframe = document.createElement('iframe');
-  iframe.style.display = 'none';
-  const params = new URLSearchParams({
-    client_id: GOOGLE_CLIENT_ID,
-    redirect_uri: window.location.href.split('#')[0],
-    response_type: 'token',
-    scope: DRIVE_SCOPE,
-    prompt: 'none'
-  });
-  iframe.src = 'https://accounts.google.com/o/oauth2/v2/auth?'+params;
-  document.body.appendChild(iframe);
-  // Parse token from iframe navigation if Google redirects back
-  iframe.onload = () => {
-    try {
-      const hash = iframe.contentWindow.location.hash;
-      const token = parseTokenFromHash(hash);
-      if (token) {
-        applyToken(token);
-      }
-    } catch(e) {
-      // Cross-origin — silent auth failed (user not signed in); that's fine
-    }
-    setTimeout(()=> iframe.remove(), 500);
-  };
-  // Fallback: also check if current page hash has token (redirect flow)
-  checkHashForToken();
-}
-
-// ── Token listener for popup flow ─────────────────────────────────────
-function listenForToken(popup, doBackupAfter) {
-  const poll = setInterval(()=>{
-    try {
-      const hash = popup.location.hash;
-      if (hash && hash.includes('access_token')) {
-        clearInterval(poll);
-        popup.close();
-        const token = parseTokenFromHash(hash);
-        if (token) {
-          applyToken(token);
-          if (doBackupAfter) uploadToDrive(true);
-        }
-      }
-    } catch(e) { /* cross-origin during navigation, keep polling */ }
-    if (popup.closed) { clearInterval(poll); setDriveState('','Connect Drive'); }
-  }, 300);
-}
-
-// ── Handle redirect-based token (when page is the redirect URI) ────────
-function checkHashForToken() {
-  const hash = window.location.hash;
-  if (hash && hash.includes('access_token')) {
-    const token = parseTokenFromHash(hash);
-    if (token) {
-      applyToken(token);
-      // Clean the hash from URL without reload
-      history.replaceState(null, '', window.location.pathname + window.location.search);
-    }
-  }
-}
-
-// ── Parse access_token from OAuth hash fragment ────────────────────────
-function parseTokenFromHash(hash) {
-  if (!hash) return null;
-  const params = new URLSearchParams(hash.replace(/^#/, ''));
-  const accessToken = params.get('access_token');
-  const expiresIn   = parseInt(params.get('expires_in') || '3600');
-  if (!accessToken) return null;
-  return { accessToken, expiresIn };
+  setDriveState('syncing', 'Waiting for sign-in…');
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
 }
 
 // ── Store token and update UI ──────────────────────────────────────────
@@ -1423,25 +1355,16 @@ function applyToken({ accessToken, expiresIn }) {
   driveToken    = accessToken;
   driveTokenExp = Date.now() + expiresIn * 1000;
   setDriveState('auto-on synced', 'Auto-backup on');
-  // Schedule a silent token refresh before it expires
-  const refreshIn = Math.max((expiresIn - 300) * 1000, 60000);
-  setTimeout(silentAuth, refreshIn);
 }
 
 // ── Schedule a debounced backup (waits 2 s after last save) ───────────
 function scheduleAutoBackup() {
   clearTimeout(autoBackupTimer);
   autoBackupTimer = setTimeout(()=> {
-    if (!driveToken || Date.now() > driveTokenExp - TOKEN_HEADROOM) {
-      // Token expired; try silent refresh first, then backup
-      silentAuth();
-      setTimeout(()=>{
-        if (driveToken) uploadToDrive(false);
-        // else: user not signed in — skip silently
-      }, 2000);
-    } else {
+    if (driveToken && Date.now() < driveTokenExp - TOKEN_HEADROOM) {
       uploadToDrive(false);
     }
+    // If not signed in, skip silently — user must click Connect Drive first
   }, 2000);
 }
 
